@@ -1,0 +1,25 @@
+# python
+__pycache__/
+*.pyc
+
+# env
+.env
+.venv/
+venv/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# logs
+*.log
+
+# generated files
+output.png
+
+# E2B/artifacts
+artifacts/

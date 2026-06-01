@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+python-dotenv
+pydantic
+azure-cosmos
+azure-identity
+databricks-sql-connector
+databricks-sdk
+openai

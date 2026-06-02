@@ -94,3 +94,26 @@ def get_messages(
             partition_key=chat_id,
         )
     )
+
+def get_chat_by_id(chat_id: str, user_id: str):
+    query = """
+    SELECT * FROM c
+    WHERE c.id = @chat_id
+    AND c.user_id = @user_id
+    """
+
+    items = list(
+        chat_sessions_container.query_items(
+            query=query,
+            parameters=[
+                {"name": "@chat_id", "value": chat_id},
+                {"name": "@user_id", "value": user_id},
+            ],
+            partition_key=user_id,
+        )
+    )
+
+    if not items:
+        return None
+
+    return items[0]

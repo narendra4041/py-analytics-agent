@@ -7,3 +7,5 @@ azure-identity
 databricks-sql-connector
 databricks-sdk
 openai
+e2b-code-interpreter
+azure-storage-blob

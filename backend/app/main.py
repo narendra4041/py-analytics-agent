@@ -9,6 +9,18 @@ from backend.app.services.databricks_service import (
 )
 from pydantic import BaseModel
 from backend.app.services.llm_service import generate_python_code
+from backend.app.sandbox.executor import execute_python_code
+from backend.app.models import ExecuteCodeRequest, GenerateCodeRequest
+
+from fastapi import Depends, HTTPException
+
+from backend.app.auth import get_current_user_id
+from backend.app.models import AgentChatRequest
+from backend.app.routes.chats import get_chat_by_id
+from backend.app.db.cosmos import messages_container
+from uuid import uuid4
+from datetime import datetime, timezone
+from backend.app.storage.blob import upload_chart_base64
 
 app = FastAPI(title="py-analytics-agent")
 
@@ -62,10 +74,6 @@ def databricks_schema_context(
 ):
     return get_schema_context(catalog, schema)
 
-class GenerateCodeRequest(BaseModel):
-    query: str
-    catalog: str
-    schema: str
 
 @app.post("/agent/generate-code")
 def agent_generate_code(payload: GenerateCodeRequest):
@@ -83,4 +91,100 @@ def agent_generate_code(payload: GenerateCodeRequest):
 
     return {
         "code": code
+    }
+
+@app.post("/agent/execute-code")
+def agent_execute_code(payload: ExecuteCodeRequest):
+
+    response = execute_python_code(
+        payload.code
+    )
+
+    return response
+
+
+@app.post("/agent/chat")
+def agent_chat(
+    payload: AgentChatRequest,
+    user_id: str = Depends(get_current_user_id),
+):
+    chat = get_chat_by_id(
+        chat_id=payload.chat_id,
+        user_id=user_id,
+    )
+
+    if not chat:
+        raise HTTPException(
+            status_code=404,
+            detail="Chat not found",
+        )
+
+    user_message = {
+        "id": str(uuid4()),
+        "chat_id": payload.chat_id,
+        "user_id": user_id,
+        "role": "user",
+        "content": payload.message,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+    messages_container.create_item(user_message)
+
+    schema_context = get_schema_context(
+        chat["catalog"],
+        chat["schema"],
+    )
+
+    code = generate_python_code(
+        user_query=payload.message,
+        catalog=chat["catalog"],
+        schema=chat["schema"],
+        schema_context=schema_context,
+    )
+
+    execution = execute_python_code(code)
+
+    assistant_result = None
+
+    if execution["results"]:
+        assistant_result = execution["results"][0]["json"]
+
+    if assistant_result is None and execution.get("chart_base64"):
+        assistant_result = {
+            "type": "chart",
+            "summary": "Chart generated successfully",
+            "chart_base64": execution["chart_base64"],
+        }
+    
+    if (
+        assistant_result
+        and assistant_result.get("type") == "chart"
+        and assistant_result.get("chart_base64")
+    ):
+        chart_url = upload_chart_base64(
+            assistant_result["chart_base64"],
+            payload.chat_id,
+        )
+
+        assistant_result["chart_url"] = chart_url
+        assistant_result.pop("chart_base64", None)
+
+    assistant_message = {
+        "id": str(uuid4()),
+        "chat_id": payload.chat_id,
+        "user_id": user_id,
+        "role": "assistant",
+        "content": assistant_result,
+        "generated_code": code,
+        "execution": execution,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+    messages_container.create_item(assistant_message)
+
+    return {
+        "chat_id": payload.chat_id,
+        "code": code,
+        "result": assistant_result,
+        "execution_error": execution["error"],
     }

@@ -29,3 +29,15 @@ class Message(BaseModel):
     role: str
     content: str
     created_at: datetime
+
+class ExecuteCodeRequest(BaseModel):
+    code: str
+
+class GenerateCodeRequest(BaseModel):
+    query: str
+    catalog: str
+    schema: str
+
+class AgentChatRequest(BaseModel):
+    chat_id: str
+    message: str

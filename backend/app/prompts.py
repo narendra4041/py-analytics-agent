@@ -69,9 +69,16 @@ Table result:
 result = {
     "type": "table",
     "summary": "...",
-    "columns": [...],
-    "rows": [...]
+    "columns": df.columns.tolist(),
+    "rows": df.astype(str).to_dict("records")
 }
+
+For table results, always use:
+
+df.astype(str).to_dict("records")
+
+Never return pandas Timestamp, Decimal, date, or datetime objects directly.
+Convert all table row values to strings before assigning result.
 
 Chart result:
 

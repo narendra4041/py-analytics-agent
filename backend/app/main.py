@@ -16,11 +16,15 @@ from fastapi import Depends, HTTPException
 
 from backend.app.auth import get_current_user_id
 from backend.app.models import AgentChatRequest
-from backend.app.routes.chats import get_chat_by_id
+from backend.app.routes.chats import (
+    get_chat_by_id,
+    get_recent_messages,
+)
 from backend.app.db.cosmos import messages_container
 from uuid import uuid4
 from datetime import datetime, timezone
 from backend.app.storage.blob import upload_chart_base64
+from backend.app.services.intent_service import classify_intent
 
 app = FastAPI(title="py-analytics-agent")
 
@@ -129,6 +133,43 @@ def agent_chat(
     }
 
     messages_container.create_item(user_message)
+    
+    conversation_history = get_recent_messages(
+        chat_id=payload.chat_id,
+        user_id=user_id,
+        limit=10,
+    )
+
+    intent = classify_intent(
+        message=payload.message,
+        conversation_history=conversation_history,
+    )
+
+    assistant_result = None
+
+    if intent == "GENERAL":
+        assistant_result = {
+            "type": "text",
+            "summary": "Hi, I can help you analyze your data, create tables, and generate charts."
+        }
+
+        assistant_message = {
+            "id": str(uuid4()),
+            "chat_id": payload.chat_id,
+            "user_id": user_id,
+            "role": "assistant",
+            "content": assistant_result,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        }
+
+        messages_container.create_item(assistant_message)
+
+        return {
+            "chat_id": payload.chat_id,
+            "intent": intent,
+            "result": assistant_result,
+            "execution_error": None,
+        }
 
     schema_context = get_schema_context(
         chat["catalog"],
@@ -140,11 +181,10 @@ def agent_chat(
         catalog=chat["catalog"],
         schema=chat["schema"],
         schema_context=schema_context,
+        conversation_history=conversation_history,
     )
 
     execution = execute_python_code(code)
-
-    assistant_result = None
 
     if execution["results"]:
         assistant_result = execution["results"][0]["json"]

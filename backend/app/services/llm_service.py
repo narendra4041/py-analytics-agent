@@ -15,7 +15,17 @@ def generate_python_code(
     catalog: str,
     schema: str,
     schema_context: dict,
+    conversation_history: list | None = None,
 ):
+    
+    conversation_history = conversation_history or []
+
+    history_text = "\n".join(
+        [
+            f"{msg['role']}: {msg.get('content')}"
+            for msg in conversation_history
+        ]
+    )
     response = client.chat.completions.create(
         model="gpt-4.1",
         temperature=0,
@@ -27,18 +37,21 @@ def generate_python_code(
             {
                 "role": "user",
                 "content": f"""
-Selected catalog:
-{catalog}
+                    Selected catalog:
+                    {catalog}
 
-Selected schema:
-{schema}
+                    Selected schema:
+                    {schema}
 
-Available schema context:
-{schema_context}
+                    Available schema context:
+                    {schema_context}
 
-User question:
-{user_query}
-""",
+                    Recent conversation:
+                    {history_text}
+
+                    Current user question:
+                    {user_query}
+                    """,
             },
         ],
     )

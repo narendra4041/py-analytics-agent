@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 
 from backend.app.auth import get_current_user_id
 from backend.app.db.cosmos import (
@@ -77,6 +77,17 @@ def get_messages(
     chat_id: str,
     user_id: str = Depends(get_current_user_id),
 ):
+    chat = get_chat_by_id(
+        chat_id=chat_id,
+        user_id=user_id,
+    )
+
+    if not chat:
+        raise HTTPException(
+            status_code=404,
+            detail="Chat not found",
+        )
+
     query = """
     SELECT * FROM c
     WHERE c.chat_id = @chat_id
@@ -117,3 +128,26 @@ def get_chat_by_id(chat_id: str, user_id: str):
         return None
 
     return items[0]
+
+def get_recent_messages(chat_id: str, user_id: str, limit: int = 10):
+    query = """
+    SELECT * FROM c
+    WHERE c.chat_id = @chat_id
+    AND c.user_id = @user_id
+    ORDER BY c.created_at DESC
+    """
+
+    items = list(
+        messages_container.query_items(
+            query=query,
+            parameters=[
+                {"name": "@chat_id", "value": chat_id},
+                {"name": "@user_id", "value": user_id},
+            ],
+            partition_key=chat_id,
+        )
+    )
+
+    items = items[:limit]
+
+    return list(reversed(items))

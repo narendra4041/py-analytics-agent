@@ -13,7 +13,7 @@ from backend.app.models import (
     MessageCreate,
 )
 
-router = APIRouter()
+router = APIRouter(tags=["Chats"])
 
 
 @router.post("/chats")

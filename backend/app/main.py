@@ -27,6 +27,7 @@ from uuid import uuid4
 from datetime import datetime, timezone
 from backend.app.storage.blob import upload_chart_base64
 from backend.app.services.intent_service import classify_intent
+from backend.app.safety import validate_generated_code
 
 app = FastAPI(title="py-analytics-agent")
 
@@ -149,7 +150,7 @@ def agent_chat(
 
     assistant_result = None
     was_repaired = False
-    
+
     if intent == "GENERAL":
         assistant_result = {
             "type": "text",
@@ -188,6 +189,7 @@ def agent_chat(
     )
     
     
+    validate_generated_code(code)
     execution = execute_python_code(code)
 
     if execution["error"]:
@@ -204,7 +206,8 @@ def agent_chat(
         repaired_execution = execute_python_code(repaired_code)
         was_repaired = True
         code = repaired_code
-        execution = repaired_execution
+        validate_generated_code(repaired_code)
+        execution = execute_python_code(repaired_code)
 
     if execution["results"]:
         assistant_result = execution["results"][0]["json"]

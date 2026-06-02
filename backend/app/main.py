@@ -7,8 +7,10 @@ from backend.app.services.databricks_service import (
     list_tables,
     get_schema_context,
 )
-from pydantic import BaseModel
-from backend.app.services.llm_service import generate_python_code
+from backend.app.services.llm_service import (
+    generate_python_code,
+    repair_python_code,
+)
 from backend.app.sandbox.executor import execute_python_code
 from backend.app.models import ExecuteCodeRequest, GenerateCodeRequest
 
@@ -146,7 +148,8 @@ def agent_chat(
     )
 
     assistant_result = None
-
+    was_repaired = False
+    
     if intent == "GENERAL":
         assistant_result = {
             "type": "text",
@@ -183,8 +186,25 @@ def agent_chat(
         schema_context=schema_context,
         conversation_history=conversation_history,
     )
-
+    
+    
     execution = execute_python_code(code)
+
+    if execution["error"]:
+        repaired_code = repair_python_code(
+            original_code=code,
+            error=execution["error"],
+            user_query=payload.message,
+            catalog=chat["catalog"],
+            schema=chat["schema"],
+            schema_context=schema_context,
+            conversation_history=conversation_history,
+        )
+
+        repaired_execution = execute_python_code(repaired_code)
+        was_repaired = True
+        code = repaired_code
+        execution = repaired_execution
 
     if execution["results"]:
         assistant_result = execution["results"][0]["json"]
@@ -227,4 +247,5 @@ def agent_chat(
         "code": code,
         "result": assistant_result,
         "execution_error": execution["error"],
+        "was_repaired": was_repaired,
     }

@@ -9,7 +9,7 @@ import {
 import Sidebar from "@/components/Sidebar";
 import ResultRenderer from "@/components/ResultRenderer";
 import ChatInput from "@/components/ChatInput";
-
+import MessageBubble from "@/components/MessageBubble";
 import {
   getChats,
   getMessages,
@@ -41,6 +41,9 @@ export default function Home() {
 
   const [newChatOpen, setNewChatOpen] =
     useState(false);
+
+  const [loadingResponse, setLoadingResponse] =
+  useState(false);
 
 
   useEffect(() => {
@@ -94,24 +97,37 @@ export default function Home() {
       userMessage,
     ]);
 
-    const response = await sendAgentMessage(
-      selectedChat.id,
-      message
-    );
+    setLoadingResponse(true);
 
-    const assistantMessage: ChatMessage = {
-      id: crypto.randomUUID(),
-      chat_id: selectedChat.id,
-      user_id: "narendra",
-      role: "assistant",
-      content: response.result,
-      created_at: new Date().toISOString(),
-    };
+    try {
 
-    setMessages((current) => [
-      ...current,
-      assistantMessage,
-    ]);
+      const response = await sendAgentMessage(
+        selectedChat.id,
+        message
+      );
+
+
+      const assistantMessage: ChatMessage = {
+        id: crypto.randomUUID(),
+        chat_id: selectedChat.id,
+        user_id: "narendra",
+        role: "assistant",
+        content: response.result,
+        created_at: new Date().toISOString(),
+      };
+
+
+      setMessages((current) => [
+        ...current,
+        assistantMessage,
+      ]);
+
+    }
+    finally {
+
+      setLoadingResponse(false);
+
+    }
   }
 
 
@@ -152,31 +168,18 @@ export default function Home() {
         <div className="flex-1 overflow-auto p-6 space-y-3">
 
           {messages.map((message) => (
-            <div
+            <MessageBubble
               key={message.id}
-              className="rounded border p-3"
-            >
-              <div className="text-xs text-gray-500 mb-2">
-                {message.role}
-              </div>
-
-              {
-                message.content === null ? (
-                  <p className="text-sm text-gray-400">
-                    No content
-                  </p>
-                ) : typeof message.content === "string" ? (
-                  <pre className="whitespace-pre-wrap text-sm">
-                    {message.content}
-                  </pre>
-                ) : (
-                  <ResultRenderer
-                    result={message.content}
-                  />
-                )
-              }
-            </div>
+              message={message}
+            />
           ))}
+          {loadingResponse && (
+            <div className="flex justify-start">
+              <div className="bg-gray-100 rounded-2xl px-4 py-3 text-sm">
+                Analyzing your data...
+              </div>
+            </div>
+          )}
 
           <div ref={messagesEndRef} />
 

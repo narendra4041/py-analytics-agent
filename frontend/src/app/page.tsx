@@ -1,13 +1,19 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 
 import Sidebar from "@/components/Sidebar";
 import ResultRenderer from "@/components/ResultRenderer";
+import ChatInput from "@/components/ChatInput";
 
 import {
   getChats,
   getMessages,
+  sendAgentMessage,
 } from "@/lib/api";
 
 import type {
@@ -15,6 +21,7 @@ import type {
   ChatSession,
 } from "@/lib/types";
 
+import NewChatModal from "@/components/NewChatModal";
 
 export default function Home() {
   const [chats, setChats] =
@@ -29,8 +36,13 @@ export default function Home() {
   const [loading, setLoading] =
     useState(true);
 
+  const messagesEndRef =
+    useRef<HTMLDivElement | null>(null);
 
-  // runs once when page opens
+  const [newChatOpen, setNewChatOpen] =
+    useState(false);
+
+
   useEffect(() => {
     getChats()
       .then((data) => {
@@ -40,6 +52,13 @@ export default function Home() {
         setLoading(false);
       });
   }, []);
+
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({
+      behavior: "smooth",
+    });
+  }, [messages]);
 
 
   async function handleSelectChat(
@@ -54,53 +73,92 @@ export default function Home() {
   }
 
 
+  async function handleSendMessage(
+    message: string
+  ) {
+    if (!selectedChat) {
+      return;
+    }
+
+    const userMessage: ChatMessage = {
+      id: crypto.randomUUID(),
+      chat_id: selectedChat.id,
+      user_id: "narendra",
+      role: "user",
+      content: message,
+      created_at: new Date().toISOString(),
+    };
+
+    setMessages((current) => [
+      ...current,
+      userMessage,
+    ]);
+
+    const response = await sendAgentMessage(
+      selectedChat.id,
+      message
+    );
+
+    const assistantMessage: ChatMessage = {
+      id: crypto.randomUUID(),
+      chat_id: selectedChat.id,
+      user_id: "narendra",
+      role: "assistant",
+      content: response.result,
+      created_at: new Date().toISOString(),
+    };
+
+    setMessages((current) => [
+      ...current,
+      assistantMessage,
+    ]);
+  }
+
+
   return (
     <main className="flex h-screen">
 
-      {/* Left sidebar */}
       <Sidebar
         chats={chats}
         selectedChatId={selectedChat?.id}
         onSelectChat={handleSelectChat}
+        onNewChat={() => setNewChatOpen(true)}
       />
 
 
-      {/* Chat area */}
-      <section className="flex-1 p-6 overflow-auto">
+      <section className="flex-1 flex flex-col">
 
-        <h1 className="text-2xl font-bold">
-          {
-            selectedChat
-              ? selectedChat.title
-              : "Py Analytics Agent"
-          }
-        </h1>
+        <div className="p-6 border-b">
+          <h1 className="text-2xl font-bold">
+            {
+              selectedChat
+                ? selectedChat.title
+                : "Py Analytics Agent"
+            }
+          </h1>
+
+          <p className="mt-2 text-gray-500">
+            {
+              loading
+                ? "Loading chats..."
+                : selectedChat
+                  ? `${selectedChat.catalog}.${selectedChat.schema}`
+                  : "Select a chat to begin."
+            }
+          </p>
+        </div>
 
 
-        <p className="mt-2 text-gray-500">
-          {
-            loading
-              ? "Loading chats..."
-              : selectedChat
-                ? `${selectedChat.catalog}.${selectedChat.schema}`
-                : "Select a chat to begin."
-          }
-        </p>
-
-
-        {/* Messages */}
-        <div className="mt-6 space-y-3">
+        <div className="flex-1 overflow-auto p-6 space-y-3">
 
           {messages.map((message) => (
             <div
               key={message.id}
               className="rounded border p-3"
             >
-
               <div className="text-xs text-gray-500 mb-2">
                 {message.role}
               </div>
-
 
               {
                 message.content === null ? (
@@ -112,16 +170,38 @@ export default function Home() {
                     {message.content}
                   </pre>
                 ) : (
-                  <ResultRenderer result={message.content} />
+                  <ResultRenderer
+                    result={message.content}
+                  />
                 )
               }
-
             </div>
           ))}
 
+          <div ref={messagesEndRef} />
+
         </div>
 
+
+        <ChatInput
+          disabled={!selectedChat}
+          onSend={handleSendMessage}
+        />
+
       </section>
+      <NewChatModal
+        open={newChatOpen}
+        onClose={() => setNewChatOpen(false)}
+        onCreated={(chat) => {
+          setChats((current) => [
+            chat,
+            ...current,
+          ]);
+
+          setSelectedChat(chat);
+          setMessages([]);
+        }}
+      />
 
     </main>
   );

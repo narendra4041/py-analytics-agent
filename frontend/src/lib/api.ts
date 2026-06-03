@@ -61,3 +61,40 @@ export async function sendAgentMessage(
     }),
   });
 }
+
+export async function getCatalogs() {
+  return request<{
+    catalogs: string[];
+  }>("/databricks/catalogs");
+}
+
+
+export async function getSchemas(
+  catalog: string
+) {
+  return request<{
+    catalog: string;
+    schemas: string[];
+  }>(
+    `/databricks/schemas?catalog=${catalog}`
+  );
+}
+
+
+export async function createChat(
+  title: string,
+  catalog: string,
+  schema: string
+) {
+  return request<ChatSession>(
+    "/chats",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        title,
+        catalog,
+        schema,
+      }),
+    }
+  );
+}

@@ -12,6 +12,7 @@ from backend.app.models import (
     ChatSessionCreate,
     MessageCreate,
 )
+from backend.app.storage.blob import generate_chart_sas_url
 
 router = APIRouter(tags=["Chats"])
 
@@ -95,7 +96,7 @@ def get_messages(
     ORDER BY c.created_at ASC
     """
 
-    return list(
+    items = list(
         messages_container.query_items(
             query=query,
             parameters=[
@@ -105,6 +106,20 @@ def get_messages(
             partition_key=chat_id,
         )
     )
+
+    for item in items:
+        content = item.get("content")
+
+        if (
+            isinstance(content, dict)
+            and content.get("type") == "chart"
+            and content.get("blob_name")
+        ):
+            content["chart_url"] = generate_chart_sas_url(
+                content["blob_name"]
+            )
+
+    return items
 
 def get_chat_by_id(chat_id: str, user_id: str):
     query = """

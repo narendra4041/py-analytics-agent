@@ -150,14 +150,15 @@ def agent_chat(
         and assistant_result.get("type") == "chart"
         and assistant_result.get("chart_base64")
     ):
-        chart_url = upload_chart_base64(
+        chart_artifact = upload_chart_base64(
             assistant_result["chart_base64"],
             payload.chat_id,
         )
 
-        assistant_result["chart_url"] = chart_url
+        assistant_result["blob_name"] = chart_artifact["blob_name"]
+        assistant_result.pop("chart_url", None)
         assistant_result.pop("chart_base64", None)
-
+        
     assistant_message = {
         "id": str(uuid4()),
         "chat_id": payload.chat_id,
@@ -171,10 +172,18 @@ def agent_chat(
 
     messages_container.create_item(assistant_message)
 
+    response_result = assistant_result.copy()
+
+    if (
+        response_result.get("type") == "chart"
+        and response_result.get("blob_name")
+    ):
+        response_result["chart_url"] = chart_artifact["chart_url"]
+
     return {
         "chat_id": payload.chat_id,
         "code": code,
-        "result": assistant_result,
+        "result": response_result,
         "execution_error": execution["error"],
         "was_repaired": was_repaired,
     }

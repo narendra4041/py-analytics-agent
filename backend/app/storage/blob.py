@@ -1,9 +1,15 @@
 import os
 import base64
 from uuid import uuid4
+from datetime import datetime, timedelta, timezone
 
 from azure.identity import DefaultAzureCredential
-from azure.storage.blob import BlobServiceClient, ContentSettings
+from azure.storage.blob import (
+    BlobServiceClient,
+    ContentSettings,
+    BlobSasPermissions,
+    generate_blob_sas,
+)
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -38,4 +44,48 @@ def upload_chart_base64(chart_base64: str, chat_id: str) -> str:
         ),
     )
 
-    return blob_client.url
+    start_time = datetime.now(timezone.utc) - timedelta(minutes=5)
+    expiry_time = datetime.now(timezone.utc) + timedelta(hours=1)
+
+    user_delegation_key = blob_service_client.get_user_delegation_key(
+        key_start_time=start_time,
+        key_expiry_time=expiry_time,
+    )
+
+    sas_token = generate_blob_sas(
+        account_name=blob_service_client.account_name,
+        container_name=BLOB_CONTAINER,
+        blob_name=blob_name,
+        user_delegation_key=user_delegation_key,
+        permission=BlobSasPermissions(read=True),
+        start=start_time,
+        expiry=expiry_time,
+    )
+
+    return {
+        "blob_name": blob_name,
+        "chart_url": f"{blob_client.url}?{sas_token}",
+    }
+
+def generate_chart_sas_url(blob_name: str) -> str:
+    blob_client = container_client.get_blob_client(blob_name)
+
+    start_time = datetime.now(timezone.utc) - timedelta(minutes=5)
+    expiry_time = datetime.now(timezone.utc) + timedelta(hours=1)
+
+    user_delegation_key = blob_service_client.get_user_delegation_key(
+        key_start_time=start_time,
+        key_expiry_time=expiry_time,
+    )
+
+    sas_token = generate_blob_sas(
+        account_name=blob_service_client.account_name,
+        container_name=BLOB_CONTAINER,
+        blob_name=blob_name,
+        user_delegation_key=user_delegation_key,
+        permission=BlobSasPermissions(read=True),
+        start=start_time,
+        expiry=expiry_time,
+    )
+
+    return f"{blob_client.url}?{sas_token}"

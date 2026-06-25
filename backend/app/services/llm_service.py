@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 from openai import OpenAI
 
 from backend.app.prompts import PYTHON_CODE_GENERATION_PROMPT
+from backend.app.services.neo4j_service import get_graph_schema_prompt_context
 
 load_dotenv()
 
@@ -16,6 +17,7 @@ def generate_python_code(
     schema: str,
     schema_context: dict,
     conversation_history: list | None = None,
+    graph_schema_context: str | None = None,
 ):
     
     conversation_history = conversation_history or []
@@ -37,14 +39,17 @@ def generate_python_code(
             {
                 "role": "user",
                 "content": f"""
-                    Selected catalog:
+                    Selected Databricks catalog:
                     {catalog}
 
-                    Selected schema:
+                    Selected Databricks schema:
                     {schema}
 
-                    Available schema context:
+                    Databricks schema context:
                     {schema_context}
+
+                    Neo4j graph schema context:
+                    {graph_schema_context}
 
                     Recent conversation:
                     {history_text}
@@ -66,6 +71,7 @@ def repair_python_code(
     schema: str,
     schema_context: dict,
     conversation_history: list | None = None,
+    graph_schema_context: str | None = None,
 ):
     conversation_history = conversation_history or []
 
@@ -89,14 +95,17 @@ The previous Python code failed.
 
 Fix the code and return ONLY corrected executable Python code.
 
-Selected catalog:
+Selected Databricks catalog:
 {catalog}
 
-Selected schema:
+Selected Databricks schema:
 {schema}
 
-Available schema context:
+Databricks schema context:
 {schema_context}
+
+Neo4j graph schema context:
+{graph_schema_context}
 
 Recent conversation:
 {history_text}

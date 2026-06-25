@@ -12,6 +12,7 @@ import pandas as pd
 
 from databricks import sql
 from databricks.sdk.core import Config, oauth_service_principal
+from neo4j import GraphDatabase
 
 
 def get_credentials_provider():
@@ -34,6 +35,61 @@ def query_databricks(query: str) -> pd.DataFrame:
         return pd.read_sql(query, conn)
     finally:
         conn.close()
+
+
+_NEO4J_DRIVER = None
+
+
+def _validate_read_only_cypher(cypher: str) -> None:
+    blocked_keywords = [
+        "CREATE ",
+        "MERGE ",
+        "DELETE ",
+        "DETACH ",
+        "SET ",
+        "REMOVE ",
+        "DROP ",
+        "LOAD CSV",
+        "CALL DBMS",
+        "CALL APOC.PERIODIC",
+        "CALL APOC.LOAD",
+    ]
+
+    upper_cypher = cypher.upper()
+
+    for keyword in blocked_keywords:
+        if keyword in upper_cypher:
+            raise ValueError(
+                f"Unsafe Cypher detected. Blocked keyword: {keyword.strip()}"
+            )
+
+
+def _get_neo4j_driver():
+    global _NEO4J_DRIVER
+
+    if _NEO4J_DRIVER is None:
+        _NEO4J_DRIVER = GraphDatabase.driver(
+            os.environ["NEO4J_URI"].strip(),
+            auth=(
+                os.environ["NEO4J_USERNAME"].strip(),
+                os.environ["NEO4J_PASSWORD"].strip(),
+            ),
+        )
+
+    return _NEO4J_DRIVER
+
+
+def query_neo4j(cypher: str, parameters=None) -> pd.DataFrame:
+    _validate_read_only_cypher(cypher)
+
+    database = os.getenv("NEO4J_DATABASE", "neo4j").strip()
+    driver = _get_neo4j_driver()
+
+    with driver.session(database=database) as session:
+        result = session.run(cypher, parameters or {})
+        records = [record.data() for record in result]
+
+    return pd.DataFrame(records)
 """
 
 
@@ -53,6 +109,10 @@ def execute_python_code(code: str):
             "DATABRICKS_HTTP_PATH": os.getenv("DATABRICKS_HTTP_PATH"),
             "DATABRICKS_CLIENT_ID": os.getenv("DATABRICKS_CLIENT_ID"),
             "DATABRICKS_CLIENT_SECRET": os.getenv("DATABRICKS_CLIENT_SECRET"),
+            "NEO4J_URI": os.getenv("NEO4J_PROD_URI", "").strip(),
+            "NEO4J_USERNAME": os.getenv("NEO4J_USERNAME", "").strip(),
+            "NEO4J_PASSWORD": os.getenv("NEO4J_PASSWORD", "").strip(),
+            "NEO4J_DATABASE": os.getenv("NEO4J_DATABASE", "neo4j").strip(),
         }
     ) as sandbox:
         execution = sandbox.run_code(full_code)

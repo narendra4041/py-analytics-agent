@@ -29,7 +29,7 @@ from backend.app.sandbox.executor import execute_python_code
 from backend.app.storage.blob import upload_chart_base64
 
 from backend.app.safety import validate_generated_code
-
+from backend.app.services.neo4j_service import get_graph_schema_prompt_context
 
 router = APIRouter(
     prefix="/agent",
@@ -68,6 +68,8 @@ def agent_chat(
         user_id=user_id,
         limit=10,
     )
+
+    graph_schema_context = get_graph_schema_prompt_context()
 
     intent = classify_intent(
         message=payload.message,
@@ -112,6 +114,7 @@ def agent_chat(
         schema=chat["schema"],
         schema_context=schema_context,
         conversation_history=conversation_history,
+        graph_schema_context=graph_schema_context,
     )
     
     
@@ -127,6 +130,7 @@ def agent_chat(
             schema=chat["schema"],
             schema_context=schema_context,
             conversation_history=conversation_history,
+            graph_schema_context=graph_schema_context,
         )
 
         repaired_execution = execute_python_code(repaired_code)

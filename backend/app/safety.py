@@ -30,11 +30,13 @@ def validate_generated_code(code: str) -> None:
                 f"Blocked unsafe code pattern: {pattern}"
             )
 
-    if "query_databricks(" not in code:
-        raise ValueError(
-            "Generated code must use query_databricks()"
-        )
+    has_databricks = "query_databricks(" in code
+    has_neo4j = "query_neo4j(" in code
 
+    if not has_databricks and not has_neo4j:
+        raise ValueError(
+            "Generated code must use query_databricks() or query_neo4j()."
+        )
     if "result" not in code:
         raise ValueError(
             "Generated code must assign result"

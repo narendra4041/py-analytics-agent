@@ -9,3 +9,5 @@ databricks-sdk
 openai
 e2b-code-interpreter
 azure-storage-blob
+neo4j
+pandas

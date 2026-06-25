@@ -9,5 +9,6 @@ template = (
         "pandas",
         "numpy",
         "matplotlib",
+        "neo4j",
     ])
 )
